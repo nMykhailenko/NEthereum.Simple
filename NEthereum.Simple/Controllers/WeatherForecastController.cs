@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using NEthereum.Simple.Models;
 
 namespace NEthereum.Simple.Controllers
 {
@@ -23,23 +24,23 @@ namespace NEthereum.Simple.Controllers
             _logger = logger;
         }
 
-        [Route("/blockchain")]
-        [HttpGet]
-        public async Task<IActionResult> Blockchain()
+        [HttpGet("{id}")]
+        public async Task<IActionResult> Blockchain(int id)
         {
             var service = new Blockchain();
-            var t = await service.CreateRespone("{\"id\":\"2\"}", "getMaterial");
-            return Ok(t);
+            var result = await service.GetAsync(id);
+
+            return Ok(result);
         }
 
-        [Route("/blockchain/add")]
+        [Route("~/[controller]/add")]
         [HttpGet]
-        public async Task<IActionResult> BlockchainAdd()
+        public async Task<IActionResult> BlockchainAdd([FromBody]BlockModel model)
         {
             var service = new Blockchain();
-            var body = "{\"id\":\"2\",\"idBioRefMaterial\":\"ref 2\",\"name\":\"name 2\",\"unit\":\"1\",\"isBio\":0,\"dateCreated\":\"123\"}";
-            var t = await service.CreateRespone(body, "addMaterial", true);
-            return Ok(t);
+            var result = await service.CreateAsync(model);
+
+            return Ok(result);
         }
 
         [HttpGet]
