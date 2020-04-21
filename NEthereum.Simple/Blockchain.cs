@@ -5,6 +5,8 @@ using Nethereum.Hex.HexTypes;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.RPC.Eth.Transactions;
 using Nethereum.Web3.Accounts.Managed;
+using NEthereum.Simple.Models;
+using NEthereum.Simple.Models.Base;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -18,7 +20,43 @@ namespace NEthereum.Simple
 {
     public class Blockchain
     {
-        public async Task<string> CreateRespone(string jsonBody, string functionName, bool isTransaction = false)
+        public async Task<BlockModel> GetAsync(int id)
+        {
+            BlockModelBase blockModel = new BlockModelBase { id = id };
+            var modelJson = JsonConvert.SerializeObject(blockModel);
+
+            var model = await CreateResponse(modelJson, "getMaterial");
+            BlockModel result = new BlockModel()
+            {
+                idBioRefMaterial = model[0].Result.ToString(),
+                name = model[1].Result.ToString(),
+                unit = Convert.ToInt32(model[2].Result.ToString()),
+                isBio = Convert.ToBoolean(model[3].Result),
+                dateCreated = Convert.ToInt32(model[4].Result.ToString()),
+            };
+
+            return result;
+        }
+
+        public async Task<BlockModel> CreateAsync(BlockModel blockModel)
+        {
+            var stringJson = JsonConvert.SerializeObject(blockModel);
+            var model = await CreateResponse(stringJson, "addMaterial", true);
+
+            BlockModel result = new BlockModel()
+            {
+                idBioRefMaterial = model[0].Result.ToString(),
+                name = model[1].Result.ToString(),
+                unit = Convert.ToInt32(model[2].Result.ToString()),
+                isBio = Convert.ToBoolean(model[3].Result),
+                dateCreated = Convert.ToInt32(model[4].Result.ToString()),
+                id = Convert.ToInt32(model[5].Result.ToString())
+            };
+
+            return result;
+        }
+
+        public async Task<List<ParameterOutput>> CreateResponse(string jsonBody, string functionName, bool isTransaction = false)
         {
             // Get request body
 
@@ -43,11 +81,11 @@ namespace NEthereum.Simple
                 .FirstOrDefault(f => f.Name == functionName);
 
             if (functionABI == null)
-                return "Function not found!";
+                return null; //"Function not found!"
 
             var functionParameters = functionABI.InputParameters;
             if (functionParameters?.Count() != inputParameters.Count())
-                return "Parameters do not match!";
+                return null; //"Parameters do not match!"
 
             Function function = contract.GetFunction(functionName);
 
@@ -72,12 +110,10 @@ namespace NEthereum.Simple
 
                     if (results.Count == 1)
                     {
-                        var resultValue = JsonConvert.SerializeObject(results[0].Result);
-                        return resultValue;
+                        return null;
                     }
 
-                    var resultMultiValue = Activator.CreateInstance(returnType, results.Select(r => r.Result).ToArray());
-                    return JsonConvert.SerializeObject(resultMultiValue);
+                    return results;
                 }
             }
 
