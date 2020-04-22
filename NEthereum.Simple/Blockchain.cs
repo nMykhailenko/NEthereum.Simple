@@ -26,12 +26,55 @@ namespace NEthereum.Simple
         public async Task<BlockModel> GetAsync(int id)
         {
             BlockModelBase blockModel = new BlockModelBase { id = id };
-            var modelJson = JsonConvert.SerializeObject(blockModel);
-
-            var result = await CreateResponse<BlockModel>(modelJson, "getMaterial");
+            var result = await QueryAsync<BlockModelBase, BlockModel>(blockModel, "getMaterial");
 
             return result;
         }
+
+        public async Task<TOutput> QueryAsync<TInput, TOutput>(TInput body, string functionName, bool isTransaction = false) where TOutput : new()
+        {
+            var web3 = new Web3(SmartContract.BlockchainRpcEndpoint);
+            var contract = web3.Eth.GetContract(SmartContract.Abi, SmartContract.ContractAddress);
+            var users = await web3.Personal.UnlockAccount.SendRequestAsync("0x4de8efa641546c0f2176a2b66f04dd17451b2542", "Qwerty!1Qwerty!1", 120);
+
+            var functionABI = contract.ContractBuilder.ContractABI.Functions.FirstOrDefault(f => f.Name == functionName);
+            if (functionABI == null)
+                throw new ArgumentNullException($"{functionName} for contract not found.");
+
+            var functionParameters = functionABI.InputParameters;
+            var bodyProperties = body.GetPropertiesInfo();
+
+            if (!ValidateModelParameters(bodyProperties, functionParameters))
+                throw new ArgumentNullException($"Parameters do not match.");
+
+            var arguments = functionParameters.GetArguments(body);
+
+            Function function = contract.GetFunction(functionName);
+            Type returnType = GetFunctionReturnType(functionABI);
+
+            IEthCall ethCall = contract.Eth.Transactions.Call;
+            var result = await ethCall.SendRequestAsync(function.CreateCallInput(arguments), contract.Eth.DefaultBlock);
+
+            FunctionBase functionBase = function;
+            PropertyInfo builderBaseProperty = functionBase.GetType().GetProperty("FunctionBuilderBase", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (builderBaseProperty != null)
+            {
+                FunctionBuilderBase builderBase = (FunctionBuilderBase)builderBaseProperty.GetValue(functionBase);
+                PropertyInfo funcCallDecoderProperty = builderBase.GetType()
+                    .GetProperty("FunctionCallDecoder", BindingFlags.Instance | BindingFlags.NonPublic);
+                if (funcCallDecoderProperty != null)
+                {
+                    ParameterDecoder decoder = (ParameterDecoder)funcCallDecoderProperty.GetValue(builderBase);
+                    var results = decoder.DecodeDefaultData(result, functionABI.OutputParameters);
+
+                    var resultModel = new TOutput().SetPropertiesValue(results);
+                    return resultModel;
+                }
+            }
+
+            return default;
+        }
+
 
         public async Task CommandAsync<TInput>(TInput body, string functionName)
         {
@@ -72,60 +115,6 @@ namespace NEthereum.Simple
             }
 
             return true;
-        }
-
-        public async Task<TOutput> CreateResponse<TOutput>(string jsonBody, string functionName, bool isTransaction = false) where TOutput : new()
-        {
-            // Get request body
-            if (string.IsNullOrWhiteSpace(jsonBody)) jsonBody = @"{}";
-            var body = JsonConvert.DeserializeObject<JObject>(jsonBody);
-
-            // Get parameters
-            var inputParameters = body.Values();
-            var arguments = new object[inputParameters.Count()];
-            var i = 0;
-            foreach (var p in inputParameters.Values())
-            {
-                arguments[i++] = p.Value<string>();
-            }
-
-            var web3 = new Web3(SmartContract.BlockchainRpcEndpoint);
-            var contract = web3.Eth.GetContract(SmartContract.Abi, SmartContract.ContractAddress);
-            var users = await web3.Personal.UnlockAccount.SendRequestAsync("0x4de8efa641546c0f2176a2b66f04dd17451b2542", "Qwerty!1Qwerty!1", 120);
-
-            var functionABI = contract.ContractBuilder.ContractABI.Functions.FirstOrDefault(f => f.Name == functionName);
-
-            if (functionABI == null)
-                return default; //"Function not found!"
-
-            var functionParameters = functionABI.InputParameters;
-            if (functionParameters?.Count() != inputParameters.Count())
-                return default; //"Parameters do not match!"
-
-            Function function = contract.GetFunction(functionName);
-            Type returnType = GetFunctionReturnType(functionABI);
-
-            IEthCall ethCall = contract.Eth.Transactions.Call;
-            var result = await ethCall.SendRequestAsync(function.CreateCallInput(arguments), contract.Eth.DefaultBlock);
-
-            FunctionBase functionBase = function;
-            PropertyInfo builderBaseProperty = functionBase.GetType().GetProperty("FunctionBuilderBase", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (builderBaseProperty != null)
-            {
-                FunctionBuilderBase builderBase = (FunctionBuilderBase)builderBaseProperty.GetValue(functionBase);
-                PropertyInfo funcCallDecoderProperty = builderBase.GetType()
-                    .GetProperty("FunctionCallDecoder", BindingFlags.Instance | BindingFlags.NonPublic);
-                if (funcCallDecoderProperty != null)
-                {
-                    ParameterDecoder decoder = (ParameterDecoder)funcCallDecoderProperty.GetValue(builderBase);
-                    var results = decoder.DecodeDefaultData(result, functionABI.OutputParameters);
-
-                    var resultModel = new TOutput().SetPropertiesValue(results);
-                    return resultModel;
-                }
-            }
-
-            return default;
         }
 
         private Type GetFunctionReturnType(FunctionABI functionABI)
