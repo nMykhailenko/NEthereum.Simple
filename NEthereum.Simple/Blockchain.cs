@@ -25,13 +25,13 @@ namespace NEthereum.Simple
     {
         public async Task<BlockModel> GetAsync(int id)
         {
-            BlockModel blockModel = new BlockModel { id = id };
-            var result = await QueryAsync(blockModel, "getMaterial");
+            BlockModelBase blockModel = new BlockModelBase { id = id };
+            var result = await QueryAsync<BlockModelBase, BlockModel>(blockModel, "getMaterial");
 
             return result;
         }
 
-        public async Task<TOutput> QueryAsync<TOutput>(TOutput body, string functionName, bool isTransaction = false) where TOutput : new()
+        public async Task<TOutput> QueryAsync<TInput, TOutput>(TInput body, string functionName, bool isTransaction = false) where TOutput : new()
         {
             var web3 = new Web3(SmartContract.BlockchainRpcEndpoint);
             var contract = web3.Eth.GetContract(SmartContract.Abi, SmartContract.ContractAddress);
