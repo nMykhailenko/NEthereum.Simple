@@ -33,15 +33,24 @@ namespace NEthereum.Simple.Controllers
             return Ok(result);
         }
 
-        [Route("~/[controller]/add")]
-        [HttpGet]
-        public async Task<IActionResult> BlockchainAdd([FromBody]BlockModel model)
-        {
-            var service = new Blockchain();
-            var result = await service.CreateAsync(model);
+        //[Route("/blockchain/add")]
+        //[HttpGet]
+        //public async Task<IActionResult> BlockchainAdd()
+        //{
+        //    var model = new BlockModel
+        //    {
+        //        dateCreated = 333,
+        //        id = 3,
+        //        idBioRefMaterial = "ref 3",
+        //        name = "name 3",
+        //        isBio = 1,
+        //        unit = 2
+        //    };
+        //    var service = new Blockchain();
+        //    var result = await service.CreateAsync(model);
 
-            return Ok(result);
-        }
+        //    return Ok(result);
+        //}
 
         [HttpGet]
         public IEnumerable<WeatherForecast> Get()

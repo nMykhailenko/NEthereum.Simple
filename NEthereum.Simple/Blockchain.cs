@@ -1,9 +1,12 @@
 ﻿using Nethereum.ABI.FunctionEncoding;
 using Nethereum.ABI.Model;
 using Nethereum.Contracts;
+using Nethereum.Geth;
 using Nethereum.Hex.HexTypes;
+using Nethereum.JsonRpc.Client;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.RPC.Eth.Transactions;
+using Nethereum.Web3;
 using Nethereum.Web3.Accounts.Managed;
 using NEthereum.Simple.Models;
 using NEthereum.Simple.Models.Base;
@@ -25,41 +28,55 @@ namespace NEthereum.Simple
             BlockModelBase blockModel = new BlockModelBase { id = id };
             var modelJson = JsonConvert.SerializeObject(blockModel);
 
-            var model = await CreateResponse(modelJson, "getMaterial");
-            BlockModel result = new BlockModel()
-            {
-                idBioRefMaterial = model[0].Result.ToString(),
-                name = model[1].Result.ToString(),
-                unit = Convert.ToInt32(model[2].Result.ToString()),
-                isBio = Convert.ToBoolean(model[3].Result),
-                dateCreated = Convert.ToInt32(model[4].Result.ToString()),
-            };
+            var result = await CreateResponse<BlockModel>(modelJson, "getMaterial");
 
             return result;
         }
 
-        public async Task<BlockModel> CreateAsync(BlockModel blockModel)
+        public async Task CommandAsync<TInput>(TInput body, string functionName)
         {
-            var stringJson = JsonConvert.SerializeObject(blockModel);
-            var model = await CreateResponse(stringJson, "addMaterial", true);
+            var web3 = new Web3(SmartContract.BlockchainRpcEndpoint);
+            var contract = web3.Eth.GetContract(SmartContract.Abi, SmartContract.ContractAddress);
+            var users = await web3.Personal.UnlockAccount.SendRequestAsync("0x4de8efa641546c0f2176a2b66f04dd17451b2542", "Qwerty!1Qwerty!1", 120);
 
-            BlockModel result = new BlockModel()
-            {
-                idBioRefMaterial = model[0].Result.ToString(),
-                name = model[1].Result.ToString(),
-                unit = Convert.ToInt32(model[2].Result.ToString()),
-                isBio = Convert.ToBoolean(model[3].Result),
-                dateCreated = Convert.ToInt32(model[4].Result.ToString()),
-                id = Convert.ToInt32(model[5].Result.ToString())
-            };
+            var functionABI = contract.ContractBuilder.ContractABI.Functions.FirstOrDefault(f => f.Name == functionName);
+            if (functionABI == null)
+                throw new ArgumentNullException($"{functionName} for contract not found.");
 
-            return result;
+            var functionParameters = functionABI.InputParameters;
+            var bodyProperties = body.GetPropertiesInfo();
+
+            if (!ValidateModelParameters(bodyProperties, functionParameters))
+                throw new ArgumentNullException($"Parameters do not match.");
+
+            var arguments = functionParameters.GetArguments(body);
+
+            Function function = contract.GetFunction(functionName);
+            Type returnType = GetFunctionReturnType(functionABI);
+
+            var estimated = await web3.TransactionManager.EstimateGasAsync(function.CreateCallInput(arguments));
+            var transactionInput = function.CreateTransactionInput("0x4de8efa641546c0f2176a2b66f04dd17451b2542", arguments);
+
+            web3.TransactionManager.DefaultGas = 10 * estimated.Value;
+            web3.TransactionManager.DefaultGasPrice = 0;
+
+            var transactionReceipt = await web3.TransactionManager.SendTransactionAndWaitForReceiptAsync(transactionInput, null);
         }
 
-        public async Task<List<ParameterOutput>> CreateResponse(string jsonBody, string functionName, bool isTransaction = false)
+        private bool ValidateModelParameters(IEnumerable<PropertyInfo> properties, IEnumerable<Parameter> parameters)
+        {
+            foreach (var parameter in parameters)
+            {
+                var property = properties.FirstOrDefault(x => x.Name.ToLowerInvariant() == parameter.Name.ToLowerInvariant());
+                if (property == null) return false;
+            }
+
+            return true;
+        }
+
+        public async Task<TOutput> CreateResponse<TOutput>(string jsonBody, string functionName, bool isTransaction = false) where TOutput : new()
         {
             // Get request body
-
             if (string.IsNullOrWhiteSpace(jsonBody)) jsonBody = @"{}";
             var body = JsonConvert.DeserializeObject<JObject>(jsonBody);
 
@@ -72,27 +89,22 @@ namespace NEthereum.Simple
                 arguments[i++] = p.Value<string>();
             }
 
-            var web3 = new Nethereum.Web3.Web3(SmartContract.BlockchainRpcEndpoint);
+            var web3 = new Web3(SmartContract.BlockchainRpcEndpoint);
             var contract = web3.Eth.GetContract(SmartContract.Abi, SmartContract.ContractAddress);
-
             var users = await web3.Personal.UnlockAccount.SendRequestAsync("0x4de8efa641546c0f2176a2b66f04dd17451b2542", "Qwerty!1Qwerty!1", 120);
 
-            var functionABI = contract.ContractBuilder.ContractABI.Functions
-                .FirstOrDefault(f => f.Name == functionName);
+            var functionABI = contract.ContractBuilder.ContractABI.Functions.FirstOrDefault(f => f.Name == functionName);
 
             if (functionABI == null)
-                return null; //"Function not found!"
+                return default; //"Function not found!"
 
             var functionParameters = functionABI.InputParameters;
             if (functionParameters?.Count() != inputParameters.Count())
-                return null; //"Parameters do not match!"
+                return default; //"Parameters do not match!"
 
             Function function = contract.GetFunction(functionName);
-
             Type returnType = GetFunctionReturnType(functionABI);
-            //var transactionInput = function.CreateTransactionInput("0x4de8efa641546c0f2176a2b66f04dd17451b2542", arguments);
-            //var estimated = web3.TransactionManager.EstimateGasAsync(function.CreateCallInput(arguments));
-            //transactionInput.GasPrice = gasPrice;
+
             IEthCall ethCall = contract.Eth.Transactions.Call;
             var result = await ethCall.SendRequestAsync(function.CreateCallInput(arguments), contract.Eth.DefaultBlock);
 
@@ -108,16 +120,12 @@ namespace NEthereum.Simple
                     ParameterDecoder decoder = (ParameterDecoder)funcCallDecoderProperty.GetValue(builderBase);
                     var results = decoder.DecodeDefaultData(result, functionABI.OutputParameters);
 
-                    if (results.Count == 1)
-                    {
-                        return null;
-                    }
-
-                    return results;
+                    var resultModel = new TOutput().SetPropertiesValue(results);
+                    return resultModel;
                 }
             }
 
-            return null;
+            return default;
         }
 
         private Type GetFunctionReturnType(FunctionABI functionABI)

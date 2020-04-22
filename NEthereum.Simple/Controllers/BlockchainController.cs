@@ -13,11 +13,6 @@ namespace NEthereum.Simple.Controllers
     [Route("[controller]")]
     public class BlockchainController : ControllerBase
     {
-        private static readonly string[] Summaries = new[]
-        {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
-
         private readonly ILogger<BlockchainController> _logger;
 
         public BlockchainController(ILogger<BlockchainController> logger)
@@ -34,28 +29,23 @@ namespace NEthereum.Simple.Controllers
             return Ok(result);
         }
 
-        [Route("~/[controller]/add")]
+        [Route("/blockchain/add")]
         [HttpGet]
-        public async Task<IActionResult> BlockchainAdd([FromBody]BlockModel model)
+        public async Task<IActionResult> BlockchainAdd()
         {
-            var service = new Blockchain();
-            var result = await service.CreateAsync(model);
-
-            return Ok(result);
-        }
-
-
-        [HttpGet]
-        public IEnumerable<WeatherForecast> Get()
-        {
-            var rng = new Random();
-            return Enumerable.Range(1, 5).Select(index => new WeatherForecast
+            var model = new BlockModelRequest
             {
-                Date = DateTime.Now.AddDays(index),
-                TemperatureC = rng.Next(-20, 55),
-                Summary = Summaries[rng.Next(Summaries.Length)]
-            })
-            .ToArray();
+                dateCreated = 333,
+                id = 3,
+                idBioRefMaterial = "ref 3",
+                name = "name 3",
+                isBio = 1,
+                unit = 2
+            };
+            var service = new Blockchain();
+            await service.CommandAsync(model, "addMaterial");
+
+            return Ok();
         }
     }
 }
