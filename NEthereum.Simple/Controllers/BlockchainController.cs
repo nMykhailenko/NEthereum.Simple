@@ -1,11 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using NEthereum.Simple.Models;
-using NEthereum.Simple.Models.Base;
+using NEthereum.Simple.BLL.Services.Ethereum.Contracts;
+using NEthereum.Simple.BLL.Services.Ethereum.ContractsDeployment;
 
 namespace NEthereum.Simple.Controllers
 {
@@ -15,7 +12,8 @@ namespace NEthereum.Simple.Controllers
     {
         private readonly ILogger<BlockchainController> _logger;
 
-        public BlockchainController(ILogger<BlockchainController> logger)
+        public BlockchainController(
+            ILogger<BlockchainController> logger)
         {
             _logger = logger;
         }
@@ -23,28 +21,12 @@ namespace NEthereum.Simple.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> Blockchain(int id)
         {
-            var service = new Blockchain();
-            var result = await service.GetAsync(id);
-
-            return Ok(result);
+            return Ok();
         }
 
-        [Route("/blockchain/add")]
-        [HttpGet]
-        public async Task<IActionResult> BlockchainAdd()
+        [HttpPost]
+        public async Task<IActionResult> Blockchain([FromBody]object obj)
         {
-            var model = new BlockModelRequest
-            {
-                dateCreated = 333,
-                id = 3,
-                idBioRefMaterial = "ref 3",
-                name = "name 3",
-                isBio = 1,
-                unit = 2
-            };
-            var service = new Blockchain();
-            await service.CommandAsync(model, "addMaterial");
-
             return Ok();
         }
     }

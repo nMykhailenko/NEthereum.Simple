@@ -5,11 +5,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="BLL\Services\Ethereum\EthereumService.cs~RF34ddbdb.TMP" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="3.1.4" />
     <PackageReference Include="Nethereum.Autogen.ContractApi" Version="3.6.2" />
     <PackageReference Include="Nethereum.Contracts" Version="3.7.1" />
     <PackageReference Include="Nethereum.Geth" Version="3.7.1" />
     <PackageReference Include="Nethereum.RPC" Version="3.7.1" />
     <PackageReference Include="Nethereum.Web3" Version="3.7.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="BLL\Services\Ethereum\AdvEntities\Queries\" />
   </ItemGroup>
 
 
